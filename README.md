@@ -2,4 +2,4 @@
 Modelo que precide la cantidad de casos de malaria en la region Loreto - Perú.
 
 
-Nombre: Caled Itamar Lima Roque
+## Nombre: Caled Itamar Lima Roque
