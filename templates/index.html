@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Auditoría Epidemiológica - Malaria LSTM</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --slate-900: #0f172a; --slate-800: #1e293b;
+            --slate-500: #64748b; --slate-100: #f1f5f9;
+            --accent: #3b82f6;    --danger: #ef4444;
+            --success: #10b981;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; color: var(--slate-900);
+            margin: 0; padding: 40px 20px;
+        }
+
+        .container { max-width: 1000px; margin: 0 auto; }
+
+        .card {
+            background: white; border: 1px solid #e2e8f0; border-radius: 12px;
+            padding: 30px; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        h1 { font-size: 24px; margin-bottom: 5px; color: var(--slate-900); }
+        p.subtitle { color: var(--slate-500); margin-bottom: 30px; font-size: 14px; }
+
+        /* Fila de controles superiores */
+        .control-row {
+            display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 20px;
+            margin-bottom: 30px; border-bottom: 1px solid var(--slate-100); padding-bottom: 20px;
+        }
+
+        .control-group label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 8px; color: var(--slate-800); text-transform: uppercase; }
+
+        /* Grid de las 6 semanas de entrada */
+        .grid-6 {
+            display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin: 25px 0;
+        }
+
+        .input-unit { text-align: center; }
+        .input-unit label { font-size: 13px; font-weight: 600; color: var(--slate-800); display: block; margin-bottom: 8px; }
+        
+        input, select {
+            width: 100%; padding: 12px; border: 1px solid #cbd5e1;
+            border-radius: 8px; font-size: 14px; background: #fff; box-sizing: border-box; transition: 0.2s;
+        }
+
+        input:focus { border-color: var(--accent); outline: none; ring: 2px var(--accent); }
+
+        .limit-hint { font-size: 10px; color: var(--slate-500); display: block; margin-top: 5px; font-weight: 500; }
+
+        .val-error { border: 2px solid var(--danger) !important; background: #fef2f2 !important; }
+
+        button {
+            width: 100%; padding: 18px; background: var(--slate-900); color: white;
+            border: none; border-radius: 8px; font-weight: 700; font-size: 15px;
+            cursor: pointer; transition: 0.3s; margin-top: 10px;
+        }
+
+        button:hover { background: var(--slate-800); transform: translateY(-1px); }
+
+        /* Gráfico */
+        .chart-container { height: 300px; margin-top: 20px; }
+
+        /* Historial */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+        th { text-align: left; padding: 12px; background: var(--slate-100); color: var(--slate-800); }
+        td { padding: 12px; border-bottom: 1px solid var(--slate-100); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h1>Análisis de Tendencia de Malaria</h1>
+        <p class="subtitle">Herramienta de predicción de un solo paso con auditoría de datos históricos.</p>
+        
+        <div class="control-row">
+            <div class="control-group">
+                <label>Provincia de Análisis</label>
+                <select id="provincia" onchange="actualizarLimites()">
+                    <option value="MAYNAS">MAYNAS</option>
+                    <option value="REQUENA">REQUENA</option>
+                    <option value="LORETO">LORETO</option>
+                    <option value="MARISCAL RAMON CASTILLA">MARISCAL RAMÓN CASTILLA</option>
+                    <option value="UCAYALI">UCAYALI</option>
+                    <option value="DATEM DEL MARAÑON">DATEM DEL MARAÑÓN</option>
+                    <option value="PUTUMAYO">PUTUMAYO</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Semana a Predecir</label>
+                <input type="number" id="sem_actual" value="15" min="1" max="52" onchange="calcularSemanas()">
+            </div>
+            <div class="control-group">
+                <label>Año</label>
+                <input type="number" id="anho" value="2026">
+            </div>
+        </div>
+
+        <label style="font-size: 12px; font-weight: 700; color: var(--slate-800); text-transform: uppercase;">Entrada de Datos Reales (Semanas Previas)</label>
+        <div class="grid-6" id="input-container">
+            </div>
+
+        <button onclick="predecir()">EJECUTAR ANÁLISIS TÁCTICO</button>
+    </div>
+
+    <div class="card">
+        <h2>Visualización de Tendencia</h2>
+        <div class="chart-container">
+            <canvas id="graficoResultados"></canvas>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Historial de Auditoría (Datos Nutridos)</h2>
+        <table id="tablaHistorial">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Prov/Año/Sem</th>
+                    <th>S-6</th><th>S-5</th><th>S-4</th><th>S-3</th><th>S-2</th><th>S-1</th>
+                    <th style="color: var(--accent);">PREDICCIÓN</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+// DATA DE REFERENCIA HISTÓRICA (Ajustar según tus datos reales 2008-2024)
+const REFERENCIA_HISTORICA = {
+    "MAYNAS": { min: 20, max: 450 },
+    "REQUENA": { min: 5, max: 180 },
+    "LORETO": { min: 10, max: 250 },
+    "MARISCAL RAMON CASTILLA": { min: 5, max: 200 },
+    "UCAYALI": { min: 2, max: 100 },
+    "DATEM DEL MARAÑON": { min: 15, max: 300 },
+    "PUTUMAYO": { min: 1, max: 80 }
+};
+
+let chart;
+
+function inicializarInputs() {
+    const container = document.getElementById('input-container');
+    container.innerHTML = '';
+    for(let i=0; i<6; i++) {
+        container.innerHTML += `
+            <div class="input-unit">
+                <label class="sem-label">S-${6-i}</label>
+                <input type="number" class="v-in" value="50">
+                <span class="limit-hint">Cargando...</span>
+            </div>`;
+    }
+    calcularSemanas();
+    actualizarLimites();
+}
+
+function calcularSemanas() {
+    const sem = parseInt(document.getElementById('sem_actual').value);
+    const labels = document.querySelectorAll('.sem-label');
+    labels.forEach((label, index) => {
+        const numSemana = sem - (6 - index);
+        label.innerText = numSemana > 0 ? `Sem ${numSemana}` : `Sem ${52 + numSemana}`;
+    });
+}
+
+function actualizarLimites() {
+    const prov = document.getElementById('provincia').value;
+    const ref = REFERENCIA_HISTORICA[prov] || { min: 0, max: 1000 };
+    const inputs = document.querySelectorAll('.v-in');
+    const hints = document.querySelectorAll('.limit-hint');
+    
+    hints.forEach(h => h.innerText = `Rango: ${ref.min}-${ref.max}`);
+    
+    inputs.forEach(input => {
+        input.oninput = function() {
+            if(parseFloat(this.value) < ref.min || parseFloat(this.value) > ref.max) {
+                this.classList.add('val-error');
+            } else {
+                this.classList.remove('val-error');
+            }
+        };
+    });
+}
+
+async function predecir() {
+    const provincia = document.getElementById('provincia').value;
+    const anho = document.getElementById('anho').value;
+    const sem_actual = document.getElementById('sem_actual').value;
+    const inputs = document.querySelectorAll('.v-in');
+    const casos = Array.from(inputs).map(i => parseFloat(i.value));
+
+    const response = await fetch('/predict', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            provincia, anho, semana_actual: sem_actual, casos
+        })
+    });
+
+    const res = await response.json();
+    if(res.status === 'success') {
+        actualizarGrafico(casos, res.prediccion);
+        cargarHistorial();
+    }
+}
+
+function actualizarGrafico(historico, prediccion) {
+    const ctx = document.getElementById('graficoResultados').getContext('2d');
+    const labels = [...Array(6).keys()].map(i => `S-${6-i}`).concat(['PREDICCIÓN']);
+    const dataPoints = [...historico, prediccion];
+
+    if (chart) chart.destroy();
+
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Casos Semanales',
+                data: dataPoints,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 3,
+                pointRadius: 6,
+                pointBackgroundColor: (context) => context.dataIndex === 6 ? '#ef4444' : '#3b82f6',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+}
+
+async function cargarHistorial() {
+    const response = await fetch('/historial'); // Asegúrate de tener esta ruta en app.py
+    const data = await response.json();
+    const tbody = document.querySelector('#tablaHistorial tbody');
+    tbody.innerHTML = '';
+
+    data.forEach(reg => {
+        tbody.innerHTML += `
+            <tr>
+                <td>${new Date(reg.fecha_consulta).toLocaleDateString()}</td>
+                <td><b>${reg.provincia}</b><br>${reg.anho} - Sem ${reg.semana_actual}</td>
+                <td>${reg.s6}</td><td>${reg.s5}</td><td>${reg.s4}</td>
+                <td>${reg.s3}</td><td>${reg.s2}</td><td>${reg.s1}</td>
+                <td style="color:var(--accent); font-weight:bold;">${reg.prediccion}</td>
+            </tr>
+        `;
+    });
+}
+
+// Iniciar
+window.onload = () => {
+    inicializarInputs();
+    cargarHistorial();
+};
+</script>
+
+</body>
+</html>

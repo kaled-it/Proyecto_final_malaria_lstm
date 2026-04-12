@@ -1,0 +1,27 @@
+# Entornos Virtuales
+venv/
+.venv/
+env/
+ENV/
+
+# Caché de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# Archivos de Sistema
+.DS_Store
+Thumbs.db
+
+# Configuración de Editores (VS Code, etc.)
+.vscode/
+.idea/
+
+# IMPORTANTE: Archivos de Modelos Pesados
+# Descomenta las siguientes líneas si tus archivos .keras o .pkl son muy pesados 
+# (GitHub tiene un límite de 100MB por archivo). 
+# modelos_ia/*.keras
+# modelos_ia/*.pkl
